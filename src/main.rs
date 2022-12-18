@@ -16,8 +16,10 @@ use bevy::{
 };
 
 pub const CLEAR: Color = Color::rgb(1.0, 1.0, 1.0);
-pub const HEIGHT: f32 = 480.0;
+pub const HEIGHT: f32 = 600.0;
 pub const RESOLUTION: f32 = 4.0 / 3.0;
+
+const MAX_LIGHTS: usize = 64;
 
 #[derive(AsBindGroup, TypeUuid, Clone)]
 #[uuid = "f690fdae-d598-45ab-8225-97e2a3f056e0"]
@@ -25,12 +27,8 @@ pub struct CoolMaterial {
     #[uniform(0)]
     color: Color,
     #[uniform(0)]
-    time: f32,
-    #[uniform(0)]
-    position: [Vec4; 10],
+    position: [Vec4; MAX_LIGHTS],
 }
-
-const MAX_LIGHTS: usize = 10;
 
 // create n amount of vec4s using macro
 macro_rules! vec4s {
@@ -43,7 +41,6 @@ impl Default for CoolMaterial {
     fn default() -> Self {
         Self {
             color: Color::rgba(0.0, 0.0, 0.0, 0.0),
-            time: 0.0,
             position: vec4s!(MAX_LIGHTS),
         }
     }
@@ -58,18 +55,19 @@ impl Material2d for CoolMaterial {
 #[derive(Clone, ShaderType)]
 struct CoolMaterialUniformBuffer {
     color: Color,
-    time: f32,
     position: [Vec4; MAX_LIGHTS],
 }
 
 #[derive(Component, Clone, Copy)]
 struct CoolMaterialUniformInput {
-    position: [Vec4; 10],
+    color: Color,
+    position: [Vec4; MAX_LIGHTS],
 }
 
 impl Default for CoolMaterialUniformInput {
     fn default() -> Self {
         Self {
+            color: Color::rgba(0.0, 0.0, 0.0, 0.0),
             position: vec4s!(MAX_LIGHTS),
         }
     }
@@ -109,34 +107,21 @@ fn setup(
         .spawn_bundle(MaterialMesh2dBundle {
             mesh: mesh_assets
                 .add(Mesh::from(shape::Quad::from(Quad {
-                    size: Vec2::new(4., 3.),
+                    size: Vec2::new(1., 1.),
                     ..Default::default()
                 })))
                 .into(),
             material: my_material_assets.add(CoolMaterial {
-                color: Color::rgb(0.0, 1.0, 0.3),
-                time: 0.0,
                 ..Default::default()
             }),
             transform: Transform::from_xyz(0.0, 0.0, 0.0),
             ..default()
         })
-        .insert(CoolMaterialUniformInput::default());
+        .insert(CoolMaterialUniformInput {
+            color: Color::rgba(0.0, 0.0, 0.0, 0.75),
+            ..Default::default()
+        });
 }
-
-// struct ExtractedTime {
-//     seconds_since_startup: f32,
-// }
-
-// impl ExtractResource for ExtractedTime {
-//     type Source = Time;
-
-//     fn extract_resource(time: &Self::Source) -> Self {
-//         ExtractedTime {
-//             seconds_since_startup: time.seconds_since_startup() as f32,
-//         }
-//     }
-// }
 
 fn extract_health(
     mut commands: Commands,
@@ -153,7 +138,6 @@ fn extract_health(
 fn prepare_my_material(
     materials: Res<RenderMaterials2d<CoolMaterial>>,
     health_query: Query<(&CoolMaterialUniformInput, &Handle<CoolMaterial>)>,
-    // time: Res<ExtractedTime>,
     render_queue: Res<RenderQueue>,
 ) {
     for (material_input, handle) in health_query.iter() {
@@ -163,8 +147,7 @@ fn prepare_my_material(
                 let mut buffer = encase::UniformBuffer::new(Vec::new());
                 buffer
                     .write(&CoolMaterialUniformBuffer {
-                        color: Color::rgb(0.0, 0.0, 0.0),
-                        time: 0.0,
+                        color: material_input.color,
                         position: material_input.position,
                     })
                     .unwrap();
@@ -193,9 +176,9 @@ const SPEED: f32 = 100.0;
 
 fn adjust_colordata_via_kb(
     keyboard_input: Res<Input<KeyCode>>,
-    mut colordata_query: Query<&mut CoolMaterialUniformInput>,
+    mut colordata_query: Query<(&mut CoolMaterialUniformInput, &mut Transform)>,
 ) {
-    for mut colordata in colordata_query.iter_mut() {
+    for (mut colordata, mut transform) in colordata_query.iter_mut() {
         if keyboard_input.pressed(KeyCode::A) {
             colordata.position[0].x -= 0.01 * TIME_SKIP * SPEED;
         } else if keyboard_input.pressed(KeyCode::D) {
@@ -224,6 +207,24 @@ fn adjust_colordata_via_kb(
             colordata.position[1].z = colordata.position[1].z.max(0.0);
         } else if keyboard_input.pressed(KeyCode::Numpad9) {
             colordata.position[1].z += 0.01 * TIME_SKIP * SPEED;
+        }
+
+        if keyboard_input.pressed(KeyCode::Up) {
+            transform.translation.y += 0.01 * TIME_SKIP * SPEED;
+        } else if keyboard_input.pressed(KeyCode::Down) {
+            transform.translation.y -= 0.01 * TIME_SKIP * SPEED;
+        } else if keyboard_input.pressed(KeyCode::Left) {
+            transform.translation.x -= 0.01 * TIME_SKIP * SPEED;
+        } else if keyboard_input.pressed(KeyCode::Right) {
+            transform.translation.x += 0.01 * TIME_SKIP * SPEED;
+        }
+
+        if keyboard_input.pressed(KeyCode::Z) {
+            let cur_color_a = colordata.color.a();
+            colordata.color.set_a(cur_color_a - 0.01);
+        } else if keyboard_input.pressed(KeyCode::X) {
+            let cur_color_a = colordata.color.a();
+            colordata.color.set_a(cur_color_a + 0.01);
         }
         // println!("colordata: {}", colordata.value)
     }

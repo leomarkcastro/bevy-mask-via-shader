@@ -6,11 +6,10 @@ struct VertexOutput {
     @location(2) uv: vec2<f32>,
 };
 
-let MAX_FIRES = 10;
+let MAX_FIRES = 64;
 
 struct MyMat {
     color: vec4<f32>,
-    time: f32,
     position: array<vec4<f32>, MAX_FIRES>,
 }
 
@@ -27,8 +26,7 @@ fn circle(st: vec2<f32>, center: vec2<f32>, radius: f32) -> f32{
 
 @fragment
 fn fragment(input: VertexOutput) -> @location(0) vec4<f32> {
-    var output_color = vec4<f32>(1.0, 1.0, 1.0, 1.0);
-    output_color = output_color * uniform_data.color;
+    var output_color = uniform_data.color;
     for( var i: i32 = 0; i < MAX_FIRES; i= i +1) {
         if (uniform_data.position[i].z == 0.0) {
             continue;
